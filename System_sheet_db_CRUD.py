@@ -52,7 +52,7 @@ def excel_2_pdf(excel_path, excel_sheet):
         WB_PATH = excel_path
         # PDF path when saving
         PATH_TO_PDF = excel_path.replace('.xlsx','')
-        PATH_TO_PDF = excel_path.replace('.xls','')
+        PATH_TO_PDF = PATH_TO_PDF.replace('.xls','')
         PATH_TO_PDF = PATH_TO_PDF + "_" + excel_sheet + '.pdf'
         
         
@@ -83,8 +83,8 @@ excel_text_list_csv = [df.to_csv(index=False) for df in excel_text_list]  # Conv
 ## connect to postgresql
 import psycopg2
 conn = psycopg2.connect(database="test_1", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
-
 cur = conn.cursor()
+
 
 # cur.execute("""DROP TABLE Excel_data;""")
 # conn.commit()
@@ -110,3 +110,5 @@ conn.commit()
 cur.close()
 conn.close()
 
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '打打打打打'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '資料資料'""")
