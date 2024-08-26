@@ -15,10 +15,10 @@ conn = psycopg2.connect(database="test_1", user="postgres", password="lkjhgnhI1@
 cur = conn.cursor()
 
 # Function Defination
-def get_pdf_path(excel_path, excel_sheet):
-    pdf_path = excel_path.replace('.xlsx','')
-    pdf_path = excel_path.replace('.xls','')
-    pdf_path = pdf_path + "_" + excel_sheet + '.pdf'
+def get_pdf_path(excel_path, excel_sheet): #######################
+    pdf_path = excel_path.replace('.xlsx','')############### Nho phai sua lai
+    pdf_path = excel_path.replace('.xls','')#################### pdf_path = pdf_path.replace('.xls','')
+    pdf_path = pdf_path + "_" + excel_sheet + '.pdf'###################
     return pdf_path
 
 def get_image_path(excel_path, excel_sheet):
@@ -64,45 +64,45 @@ def get_excel_path(company_input, panel_input, paint_input):
 
 with st.sidebar:
     st.markdown('# Input Company Name')
-    company_input = st.text_input('company name')
+    company_input = st.text_input('Company name')
     
     st.markdown('# Input Panel (Furniture) code')
-    panel_input = st.text_input('panel code')
+    panel_input = st.text_input('Panel code')
     
     st.markdown('# Input Paint Code')
-    paint_input = st.text_input('paint code')
+    paint_input = st.text_input('Paint code')
     
     search_button = st.button('Search')
     
 if search_button:
     st.markdown('# System Sheet Search Result')
-    excel_path_list, excel_sheet_list = get_excel_path(company_input if company_input else None,
-                                panel_input if panel_input else None,
-                                paint_input if paint_input else None)
-    if excel_path_list:
-        # Prepare lists for PDF and image paths
-        pdf_path_list = []
-        image_path_list = []
-        for excel_path, excel_sheet in zip(excel_path_list, excel_sheet_list):
-            pdf_path_list.append(get_pdf_path(excel_path, excel_sheet))
-            image_path_list.append(get_image_path(excel_path, excel_sheet))
-            
-
-        for pdf_path, image_path in zip(pdf_path_list, image_path_list):
-            with st.container():
-                col_1, col_2 = st.columns(2)
-                with col_1:
-                    try:
-                        display_image(image_path)
-                    except:
-                        st.write('No Image Preview For This System Sheet')
-                with col_2:
-                    try:
-                        display_PDF(pdf_path)
-                        st.write(pdf_path)
-                    except:
-                        st.write('No PDF Preview For This System Sheet')
+    if not company_input and not panel_input and not paint_input:
+        st.write("Please Enter a Name/Code to search")
     else:
-        st.write("No System Sheet Found For This Code")
-else:
-    st.write("Please enter a code to search")
+        excel_path_list, excel_sheet_list = get_excel_path(company_input if company_input else None,
+                                    panel_input if panel_input else None,
+                                    paint_input if paint_input else None)
+        if excel_path_list:
+            # Prepare lists for PDF and image paths
+            pdf_path_list = []
+            image_path_list = []
+            for excel_path, excel_sheet in zip(excel_path_list, excel_sheet_list):
+                pdf_path_list.append(get_pdf_path(excel_path, excel_sheet))
+                image_path_list.append(get_image_path(excel_path, excel_sheet))
+                
+            for pdf_path, image_path in zip(pdf_path_list, image_path_list):
+                with st.container():
+                    col_1, col_2 = st.columns(2)
+                    with col_1:
+                        try:
+                            display_image(image_path)
+                        except:
+                            st.write('No Image Preview For This System Sheet')
+                    with col_2:
+                        try:
+                            display_PDF(pdf_path)
+                            st.write(pdf_path)
+                        except:
+                            st.write('No PDF Preview For This System Sheet')
+        else:
+            st.write("No System Sheet Found For This Code")
