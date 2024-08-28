@@ -9,32 +9,36 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 import base64
-
+from streamlit_pdf_viewer import pdf_viewer
 #Create Connection
 conn = psycopg2.connect(database="test_1", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
 # Function Defination
-def get_pdf_path(excel_path, excel_sheet): #######################
-    pdf_path = excel_path.replace('.xlsx','')############### Nho phai sua lai
-    pdf_path = excel_path.replace('.xls','')#################### pdf_path = pdf_path.replace('.xls','')
-    pdf_path = pdf_path + "_" + excel_sheet + '.pdf'###################
+def get_pdf_path(excel_path, excel_sheet): 
+    pdf_path = excel_path.replace('.xlsx','')
+    pdf_path = pdf_path.replace('.xls','')
+    pdf_path = pdf_path + "_" + excel_sheet + '.pdf'
     return pdf_path
 
 def get_image_path(excel_path, excel_sheet):
     image_path = excel_path.replace('.xlsx','')
-    image_path = excel_path.replace('.xls','')
+    image_path = image_path.replace('.xls','')
     image_path = image_path + "_" + excel_sheet + '.png'
     return image_path
 
+# def display_PDF(file):
+#     # Opening file from file path
+#     with open(file, "rb") as f:
+#         base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+#     # Embedding PDF in HTML
+#     pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="500" height="700" type="application/pdf"></iframe>'
+#     # Displaying File
+#     st.markdown(pdf_display, unsafe_allow_html=True)
+
+
 def display_PDF(file):
-    # Opening file from file path
-    with open(file, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    # Embedding PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="500" height="700" type="application/pdf"></iframe>'
-    # Displaying File
-    st.markdown(pdf_display, unsafe_allow_html=True)
+    pdf_viewer(file)
 
 def display_image(file):
     st.image(image = file,use_column_width = 'always')
@@ -49,9 +53,9 @@ def get_excel_path(company_input, panel_input, paint_input):
     #Execute query
     cur.execute("""
         SELECT excel_path, excel_sheet FROM excel_data WHERE
-        (%s IS NULL OR excel_text LIKE %s) AND
-        (%s IS NULL OR excel_text LIKE %s) AND
-        (%s IS NULL OR excel_text LIKE %s)
+        (%s IS NULL OR excel_text ILIKE %s) AND
+        (%s IS NULL OR excel_text ILIKE %s) AND
+        (%s IS NULL OR excel_text ILIKE %s)
     """, params)
     
     matched_data = cur.fetchall()
@@ -99,9 +103,10 @@ if search_button:
                         except:
                             st.write('No Image Preview For This System Sheet')
                     with col_2:
+                        st.write(pdf_path)
                         try:
                             display_PDF(pdf_path)
-                            st.write(pdf_path)
+                            
                         except:
                             st.write('No PDF Preview For This System Sheet')
         else:
