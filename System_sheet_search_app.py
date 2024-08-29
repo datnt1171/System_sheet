@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Aug 19 15:53:28 2024
+Created on Sat Aug 24 11:10:53 2024
 
 @author: KT1
 """
@@ -8,7 +8,8 @@ Created on Mon Aug 19 15:53:28 2024
 import streamlit as st
 import pandas as pd
 import psycopg2
-import base64
+#import base64
+import streamlit_ext as ste
 from streamlit_pdf_viewer import pdf_viewer
 #Create Connection
 conn = psycopg2.connect(database="test_1", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
@@ -38,7 +39,16 @@ def get_image_path(excel_path, excel_sheet):
 
 
 def display_PDF(file):
-    pdf_viewer(file)
+    pdf_viewer(file)#, rendering="legacy_iframe")
+
+def download_PDF(file):
+    with open(file, "rb") as pdf_file:
+        PDFbyte = pdf_file.read()
+
+    ste.download_button(label="Download PDF",
+                    data=PDFbyte,
+                    file_name=str(file),
+                    mime='application/octet-stream')
 
 def display_image(file):
     st.image(image = file,use_column_width = 'always')
@@ -106,8 +116,10 @@ if search_button:
                         st.write(pdf_path)
                         try:
                             display_PDF(pdf_path)
-                            
+                            download_PDF(pdf_path)
                         except:
                             st.write('No PDF Preview For This System Sheet')
         else:
             st.write("No System Sheet Found For This Code")
+    
+#ngrok http http://localhost:8501
