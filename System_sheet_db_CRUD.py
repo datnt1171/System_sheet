@@ -123,7 +123,7 @@ for name, sheet, text, path in zip(excel_name_list, excel_sheet_list, excel_text
         VALUES (%s, %s, %s, %s);
     """, (name, sheet, text, path))
 conn.commit()
-# Close cursor and communication with the database
+
 
 
 
@@ -137,13 +137,14 @@ cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'NEW'""")
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '空白表格-再修改'""")
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '產品編號'""")
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'V'""")
-
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'Material code'""")
 # Import user into user table
-cur.execute("INSERT INTO users (username, password) VALUES ('asd', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('dat', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('stanley', '123')")
+
 
 cur.close()
 conn.close()
 
-
-cur.execute("SELECT excel_name from excel_data limit 5;")
+cur.execute("SELECT * from excel_data where excel_text like '%5703%' ;")
 temp = cur.fetchall()
