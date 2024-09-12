@@ -16,6 +16,7 @@ excel_sheet_list = []
 excel_text_list = []
 excel_path_list = []
 
+
 # Get the information of excel file
 for root, dirs, files in os.walk(main_folder_path):
     for file in files:
@@ -37,9 +38,8 @@ for root, dirs, files in os.walk(main_folder_path):
                 excel_path_list.append(file_path)
 
 
-
-
 # Convert excel file to pdf to display
+###############################################################################
 import win32com.client
 
 error_path_list = []
@@ -47,7 +47,7 @@ error_sheet_list = []
 def excel_2_pdf(excel_path, excel_sheet):
     
         excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = False
+        excel.Visible = True
         
         WB_PATH = excel_path
         # PDF path when saving
@@ -74,7 +74,7 @@ def excel_2_pdf(excel_path, excel_sheet):
 
 for excel_path, excel_sheet in zip(excel_path_list,excel_sheet_list):
     excel_2_pdf(excel_path, excel_sheet)
-
+###############################################################################
 
 
 
@@ -82,11 +82,13 @@ excel_text_list_csv = [df.to_csv(index=False) for df in excel_text_list]  # Conv
 
 ## connect to postgresql
 import psycopg2
-conn = psycopg2.connect(database="test_1", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
+conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
 
 # cur.execute("""DROP TABLE Excel_data;""")
+# cur.execute("""DROP TABLE bug_report;""")
+# cur.execute("""DROP TABLE users;""")
 # conn.commit()
 # Create table
 cur.execute("""CREATE TABLE Excel_data(
@@ -96,6 +98,21 @@ cur.execute("""CREATE TABLE Excel_data(
             excel_text TEXT,
             excel_path TEXT);
             """)
+            
+cur.execute(""" CREATE TABLE bug_report(
+            id SERIAL PRIMARY KEY,
+            description TEXT NOT NULL,
+            user_email TEXT,
+            report_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            image_path TEXT
+            )""")
+
+cur.execute("""CREATE TABLE users(
+            user_id SERIAL PRIMARY KEY,
+            username text,
+            password text
+            )""")
+
 # Make the changes to the database persistent
 conn.commit()
 
@@ -106,9 +123,29 @@ for name, sheet, text, path in zip(excel_name_list, excel_sheet_list, excel_text
         VALUES (%s, %s, %s, %s);
     """, (name, sheet, text, path))
 conn.commit()
-# Close cursor and communication with the database
+
+
+
+
+# Delete useless excel_sheet
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '打打打打打'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '資料資料'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'INININ.A4x2'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'MAU1'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'MAU2'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'NEW'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '空白表格-再修改'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '產品編號'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'V'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'Material code'""")
+# Import user into user table
+cur.execute("INSERT INTO users (username, password) VALUES ('dat', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('stanley', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('dungtq', '123')")
+
+
 cur.close()
 conn.close()
 
-cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '打打打打打'""")
-cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '資料資料'""")
+cur.execute("SELECT * from excel_data where excel_text like '%5703%' ;")
+temp = cur.fetchall()
