@@ -138,9 +138,12 @@ cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '空白表格-再修�
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '產品編號'""")
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'V'""")
 cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'Material code'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '印-V'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '印-中'""")
 # Import user into user table
 cur.execute("INSERT INTO users (username, password) VALUES ('dat', '123')")
 cur.execute("INSERT INTO users (username, password) VALUES ('stanley', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('dungtq', '123')")
 
 
 cur.close()
