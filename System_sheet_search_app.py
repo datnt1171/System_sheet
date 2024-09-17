@@ -14,54 +14,13 @@ from datetime import datetime
 import os
 import uuid
 from streamlit_pdf_viewer import pdf_viewer
-import re
 #Create Connection
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
 # Function Defination
-def get_pdf_path(excel_path, excel_sheet): 
-    pdf_path = excel_path.replace('.xlsx','')
-    pdf_path = pdf_path.replace('.xls','')
-    pdf_path = pdf_path + "_" + excel_sheet + '.pdf'
-    return pdf_path
-
-def get_pdf_name(excel_name, excel_sheet):
-    pdf_name = excel_name.replace('.xlsx','')
-    pdf_name = pdf_name.replace('.xls','')
-    pdf_name = pdf_name + "_" + excel_sheet + '.pdf'
-    return pdf_name
-
-def get_pdf_id(excel_name, excel_sheet):
-    pdf_name = get_pdf_name(excel_name, excel_sheet)
-    cur.execute(""" SELECT pdf_id FROM pdf_data WHERE pdf_name = %s""", (pdf_name,))
-    pdf_id = cur.fetchall()
-    return pdf_id[0][0]
-
-
-def get_image_path(excel_path, excel_sheet):
-    image_path = excel_path.replace('.xlsx','')
-    image_path = image_path.replace('.xls','')
-    image_path = image_path + "_" + excel_sheet + '.png'
-    return image_path
-
-def display_pdf_with_google_drive(file_id):
-    google_drive_url = f"https://drive.google.com/file/d/{file_id}/preview?usp=sharing"
-    
-    google_drive_viewer = f'''
-        <iframe src="{google_drive_url}" 
-                style="width:560px; height:600px;" frameborder="0"></iframe>
-    '''
-    st.markdown(google_drive_viewer, unsafe_allow_html=True)
-
 def display_PDF(file):
     pdf_viewer(file)#, rendering="legacy_iframe")
-    
-
-def is_ios():
-    user_agent = st.session_state.get("user_agent", "")
-    return bool(re.search(r"iPhone|iPad", user_agent))
-
 def download_PDF(file):
     with open(file, "rb") as pdf_file:
         PDFbyte = pdf_file.read()
@@ -73,29 +32,29 @@ def download_PDF(file):
 
 def display_image(file):
     st.image(image = file,use_column_width = 'always')
-
-def get_excel_path(company_input, panel_input, paint_input):
+def get_search_output(company_input, panel_input):
     # Convert input to f-string
     company_input = f"%{company_input}%" if company_input else None
     panel_input = f"%{panel_input}%" if panel_input else None
-    paint_input = f"%{paint_input}%" if paint_input else None
+    #params
+    params = (company_input, company_input, panel_input, panel_input)
     
-    params = (company_input, company_input, panel_input, panel_input, paint_input, paint_input)
-    #Execute query
     cur.execute("""
-        SELECT excel_path, excel_sheet, excel_name FROM excel_data WHERE
-        (%s IS NULL OR excel_text ILIKE %s) AND
-        (%s IS NULL OR excel_text ILIKE %s) AND
-        (%s IS NULL OR excel_text ILIKE %s)
+        SELECT pdf_path, image_path 
+        FROM excel_data JOIN system_sheet_header 
+        ON excel_data.pdf_name = system_sheet_header.pdf_name
+        WHERE
+        (%s IS NULL OR factory_name_combined ILIKE %s) AND
+        (%s IS NULL OR panel_code ILIKE %s)
     """, params)
     
     matched_data = cur.fetchall()
-    matched_df = pd.DataFrame(pd.DataFrame(data = matched_data, columns=['excel_path','excel_sheet','excel_name']))
+    matched_df = pd.DataFrame(data = matched_data, columns=['pdf_path','image_path'])
     
-    excel_path_list = matched_df['excel_path'].tolist()
-    excel_sheet_list = matched_df['excel_sheet'].to_list()
-    excel_name_list = matched_df['excel_name'].to_list()
-    return excel_path_list, excel_sheet_list, excel_name_list
+    pdf_path_list = matched_df['pdf_path'].tolist()
+    image_path_list = matched_df['image_path'].tolist()
+    
+    return pdf_path_list, image_path_list
 
 def save_bug_report_to_db(report_content, user_email, image_path):
     try:
@@ -185,8 +144,6 @@ def login_page():
 
 
 
-
-
 # Search App         
 def main_app():
     if "show_bug_form" not in st.session_state:
@@ -199,9 +156,6 @@ def main_app():
         st.markdown('# Input Panel (Furniture) Code')
         panel_input = st.text_input('E.g. 212, 734')
         
-        st.markdown('# Input Paint Code (Optional)')
-        paint_input = st.text_input('E.g. CDNC 1021, ML NE STAIN 084')
-        
         search_button = st.button('Search')
         
         report_button = st.button('Report a Bug', type = "primary")
@@ -211,27 +165,13 @@ def main_app():
     st.title('System Sheet Search')
     if search_button:
         i=0
-        if not company_input and not panel_input and not paint_input:
+        if not company_input and not panel_input:
             st.write("Please Enter a Name/Code to search")
         else:
-            excel_path_list, excel_sheet_list, excel_name_list = get_excel_path(company_input if company_input else None,
-                                        panel_input if panel_input else None,
-                                        paint_input if paint_input else None)
-            if excel_path_list:
-                # Prepare lists for PDF and image paths
-                pdf_path_list = []
-                image_path_list = []
-                # Append pdf path and image path
-                for excel_path, excel_sheet in zip(excel_path_list, excel_sheet_list):
-                    pdf_path_list.append(get_pdf_path(excel_path, excel_sheet))
-                    image_path_list.append(get_image_path(excel_path, excel_sheet))
-                    
-                # Prepare lists for PDF id
-                pdf_id_list = []
-                # Append pdf id
-                for excel_name, excel_sheet in zip(excel_name_list, excel_sheet_list):
-                    pdf_id_list.append(get_pdf_id(excel_name, excel_sheet))
-                for pdf_id, image_path, pdf_path in zip(pdf_id_list, image_path_list, pdf_path_list):
+            pdf_path_list, image_path_list = get_search_output(company_input, panel_input)
+            if pdf_path_list:
+
+                for image_path, pdf_path in zip(image_path_list, pdf_path_list):
                     i+=1
                     # with st.container():
                     col_1, col_2 = st.columns(2)
@@ -243,6 +183,7 @@ def main_app():
                             st.write('No Image Preview For This System Sheet')
                     with col_2:
                         try:
+                            #display_pdf_with_google_drive(pdf_id)
                             display_PDF(pdf_path)
                             download_PDF(pdf_path)
                             #st.write(pdf_path)
