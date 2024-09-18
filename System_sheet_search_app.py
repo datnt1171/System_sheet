@@ -1,308 +1,247 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 24 11:10:53 2024
+Created on Thu Aug 15 10:55:14 2024
 
 @author: KT1
 """
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import psycopg2
-from psycopg2 import sql
-import streamlit_ext as ste
-from datetime import datetime
 import os
-import uuid
-from streamlit_pdf_viewer import pdf_viewer
+import pandas as pd
+from io import StringIO
+## connect to postgresql
 
-import plotly.express as px
-
-#Create Connection
+import psycopg2
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
-# Function Defination
-def display_PDF(file):
-    pdf_viewer(file)#, rendering="legacy_iframe")
-    
-def download_PDF(file):
-    with open(file, "rb") as pdf_file:
-        PDFbyte = pdf_file.read()
 
-    ste.download_button(label="Download PDF",
-                    data=PDFbyte,
-                    file_name=str(file),
-                    mime='application/octet-stream')
+main_folder_path = r'D:\VL1251\Ratio_compare\production_process\QUY TRINH MOI'
 
-def display_image(file):
-    st.image(image = file,use_column_width = 'always')
+excel_name_list = []
+excel_sheet_list = []
+#excel_text_list = []
+excel_path_list = []
+
+
+# Get the information of excel file
+for root, dirs, files in os.walk(main_folder_path):
+    for file in files:
+        if file.endswith('.xlsx') or file.endswith('.xls'):
+            file_path = os.path.join(root, file)
+            
+            # Read all sheets from the Excel file
+            excel_sheets = pd.read_excel(file_path, sheet_name=None)
+            
+            # Loop through each sheet
+            for sheet_name, sheet_data in excel_sheets.items():
+                # Append file name
+                excel_name_list.append(file)
+                # Append sheet name
+                excel_sheet_list.append(sheet_name)
+                # Append the DataFrame for the current sheet
+                #excel_text_list.append(sheet_data)
+                # Append the path to the list
+                excel_path_list.append(file_path)
+
+
+# Convert excel file to pdf to display
+###############################################################################
+# import win32com.client
+
+# error_path_list = []
+# error_sheet_list = []
+# def excel_2_pdf(excel_path, excel_sheet):
     
-def get_search_output(company_input, panel_input):
-    # Convert input to f-string
-    company_input = f"%{company_input}%" if company_input else None
-    panel_input = f"%{panel_input}%" if panel_input else None
-    #params
-    params = (company_input, company_input, panel_input, panel_input)
-    
+#         excel = win32com.client.Dispatch("Excel.Application")
+#         excel.Visible = True
+        
+#         WB_PATH = excel_path
+#         # PDF path when saving
+#         PATH_TO_PDF = excel_path.replace('.xlsx','')
+#         PATH_TO_PDF = PATH_TO_PDF.replace('.xls','')
+#         PATH_TO_PDF = PATH_TO_PDF + "_" + excel_sheet + '.pdf'
+        
+        
+#         # Open
+#         try:
+#             wb = excel.Workbooks.Open(WB_PATH)
+#             # Specify the sheet you want to save by index. 1 is the first (leftmost) sheet.
+#             wb.WorkSheets(excel_sheet).Select()
+#             # Save
+#             wb.ActiveSheet.ExportAsFixedFormat(0, PATH_TO_PDF)
+#             wb.Close()
+#             excel.Quit()
+#         except:
+            
+#             error_path_list.append(excel_path)
+#             error_sheet_list.append(excel_sheet)
+
+
+
+# for excel_path, excel_sheet in zip(excel_path_list,excel_sheet_list):
+#     excel_2_pdf(excel_path, excel_sheet)
+###############################################################################
+
+
+
+#excel_text_list_csv = [df.to_csv(index=False) for df in excel_text_list]  # Convert each DataFrame to a CSV string
+
+
+
+
+cur.execute("""DROP TABLE excel_data;""")
+cur.execute("""DROP TABLE bug_report;""")
+cur.execute("""DROP TABLE users;""")
+conn.commit()
+# Create table
+cur.execute("""CREATE TABLE excel_data(
+            excel_name TEXT,
+            excel_sheet TEXT,
+            excel_path TEXT,
+            pdf_path TEXT,
+            image_path TEXT,
+            pdf_name TEXT);
+            """)
+            
+cur.execute(""" CREATE TABLE bug_report(
+            id SERIAL PRIMARY KEY,
+            description TEXT NOT NULL,
+            user_email TEXT,
+            report_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            image_path TEXT
+            )""")
+
+cur.execute("""CREATE TABLE users(
+            user_id SERIAL PRIMARY KEY,
+            username text,
+            password text
+            )""")
+
+conn.commit()
+
+
+
+# Create pdf_path and image_path
+col_map = {'excel_name':excel_name_list,
+           'excel_sheet':excel_sheet_list,
+           'excel_path':excel_path_list}
+df = pd.DataFrame(col_map)
+df['pdf_path'] = df['excel_path'].replace('.xlsx','',regex=True)
+df['pdf_path'] = df['pdf_path'].replace('.xls','',regex=True)
+df['pdf_path'] = df['pdf_path'] + "_" + df['excel_sheet'] + '.pdf'
+
+df['image_path'] = df['excel_path'].replace('.xlsx','',regex=True)
+df['image_path'] = df['image_path'].replace('.xls','',regex=True)
+df['image_path'] = df['image_path'] + "_" + df['excel_sheet'] + '.png'
+
+df['pdf_name'] = df['excel_name'].replace('.xlsx','',regex=True)
+df['pdf_name'] = df['pdf_name'].replace('.xls','',regex=True)
+df['pdf_name'] = df['pdf_name'] + "_" + df['excel_sheet'] + '.pdf'
+# Insert data into table
+
+for excel_name, excel_sheet, excel_path, pdf_path, image_path, pdf_name in \
+zip(df['excel_name'], df['excel_sheet'], df['excel_path'], df['pdf_path'], df['image_path'], df['pdf_name']):
     cur.execute("""
-        SELECT *
-        FROM excel_data JOIN system_sheet_header 
-        ON excel_data.pdf_name = system_sheet_header.pdf_name
-        WHERE
-        (%s IS NULL OR system_sheet_header.factory_name_combined ILIKE %s) AND
-        (%s IS NULL OR system_sheet_header.panel_code ILIKE %s)
-    """, params)
-    
-    matched_data = cur.fetchall()
-    column_names = [description[0] for description in cur.description]
-    matched_df = pd.DataFrame(data = matched_data, columns = column_names)
-    matched_df = matched_df.loc[:,~matched_df.columns.duplicated()].copy()
-    return matched_df
+        INSERT INTO excel_data (excel_name, excel_sheet, excel_path, pdf_path, image_path, pdf_name)
+        VALUES (%s, %s, %s, %s, %s, %s);
+    """, (excel_name, excel_sheet, excel_path, pdf_path, image_path, pdf_name))
+conn.commit()
 
-def get_substrate():
-    cur.execute("""SELECT * FROM substrate""")
-    substrate = cur.fetchall()
-    column_names = [description[0] for description in cur.description]
-    df_substrate = pd.DataFrame(data = substrate, columns = column_names)
-    return df_substrate
 
-def save_bug_report_to_db(report_content, user_email, image_path):
-    try:
-        # Connect to your PostgreSQL database
-        conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
-        cursor = conn.cursor()
-        
-        # Insert bug report into a table
-        insert_query = sql.SQL(
-            "INSERT INTO bug_report (description, user_email, report_date, image_path) VALUES (%s, %s, %s, %s)"
-        )
-        cursor.execute(insert_query, (report_content, user_email, datetime.now(), image_path))
-        
-        # Commit the transaction
-        conn.commit()
-        cursor.close()
+
+
+# Delete useless excel_sheet
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '打打打打打'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '資料資料'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'INININ.A4x2'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'MAU1'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'MAU2'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'NEW'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '空白表格-再修改'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '產品編號'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'V'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = 'Material code'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '印-V'""")
+cur.execute("""DELETE FROM excel_data WHERE excel_sheet = '印-中'""")
+# Import user into user table
+cur.execute("INSERT INTO users (username, password) VALUES ('dat', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('stanley', '123')")
+cur.execute("INSERT INTO users (username, password) VALUES ('dungtq', '123')")
+
+conn.commit()
+
+
+# cur.execute("SELECT * from excel_data where excel_text like '%5703%' ;")
+# temp = cur.fetchall()
+
+
+
+
+
+# System sheet header
+cur.execute("DROP table system_sheet_header")
+conn.commit()
+cur.execute("""CREATE TABLE system_sheet_header(
+            pdf_name TEXT,
+            date DATE,
+            factory_name_combined TEXT,
+            panel_code TEXT,
+            paint_system_grouped TEXT,
+            paint_system TEXT,
+            sheen TEXT,
+            distressing TEXT,
+            customber_name TEXT,
+            description TEXT)""")
+conn.commit()
+
+
+system_sheet_header = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\new_db.xlsx')
+output = StringIO()
+system_sheet_header.to_csv(output, sep='\t', header=False, index=False)
+output.seek(0)
+
+# Define the table name
+table_name = 'system_sheet_header'
+
+try:
+    # Copy data to the table
+    cur.copy_from(output, table_name, sep='\t')
+    conn.commit()
+    print("DataFrame imported to PostgreSQL successfully!")
+except Exception as e:
+    print(f"An error occurred: {e}")
+finally:
+    if cur:
+        cur.close()
+    if conn:
         conn.close()
-        return True
-    except Exception as e:
-        st.error(f"Error saving bug report to the database: {e}")
-        return False
-    
 
 
+df_substrate = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\df_substrate.xlsx')
+df_substrate = df_substrate[['pdf_name','gb','vn','tw']]
+output = StringIO()
+df_substrate.to_csv(output, sep='\t', header=False, index=False)
+output.seek(0)
+cur.execute("""DROP TABLE substrate""")
+conn.commit()
+cur.execute("""CREATE TABLE substrate(
+            pdf_name TEXT,
+            gb TEXT,
+            vn TEXT,
+            tw TEXT)""")
+conn.commit()
+# Define the table name
+table_name = 'substrate'
 
-#Function to check user credentials
-def check_credentials(username, password):
-    # Hash the password
-    hashed_password = password
-    
-    try:
-        # Connect to your PostgreSQL database
-        conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
-        cursor = conn.cursor()
-        
-        # Query to check if the user exists with the given username and hashed password
-        query = sql.SQL("SELECT username, password FROM users WHERE username = %s AND password = %s")
-        cursor.execute(query, (username, hashed_password))
-        result = cursor.fetchone()
-        
-        cursor.close()
+try:
+    # Copy data to the table
+    cur.copy_from(output, table_name, sep='\t')
+    conn.commit()
+    print("DataFrame imported to PostgreSQL successfully!")
+except Exception as e:
+    print(f"An error occurred: {e}")
+finally:
+    if cur:
+        cur.close()
+    if conn:
         conn.close()
-        
-        # Return True if user exists, otherwise False
-        return result is not None
-    except Exception as e:
-        st.error(f"Database connection error: {e}")
-        return False
-
-# Initialize session state for user login
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if "show_login_form" not in st.session_state:
-    st.session_state.show_login_form = True
-
-# Login Page
-def login_page():
-    st.title("Login")
-    
-    if st.session_state.logged_in:
-        st.success("You are already logged in.")
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.show_login_form = True
-            st.experimental_rerun()
-    else:
-        # Show login form
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submit_button = st.form_submit_button("Login")
-            
-            if submit_button:
-                if check_credentials(username, password):
-                    st.success("Login successful!")
-                    st.session_state.logged_in = True
-                    st.session_state.show_login_form = False
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password")
-
-
-
-
-
-
-#########################################
-    # Search App  
-#########################################
-       
-def main_app():
-    if "show_bug_form" not in st.session_state:
-        st.session_state.show_bug_form = False 
-
-    with st.sidebar:
-        
-        st.markdown('# Input Company Name')
-        company_input = st.text_input('E.g. Kaiser, Timber, 國掌, QUỐC TRƯỞNG')
-        
-        st.markdown('# Input Panel (Furniture) Code')
-        panel_input = st.text_input('E.g. 212, 734')
-        st.write('\n')
-        show_system_sheet = st.checkbox('Show System Sheet', value=False)
-        st.write('\n')
-        search_button = st.button('Search', type = "primary")
-        st.write('\n')
-        report_button = st.button('Report a Bug')
-        
-    if report_button:
-        st.session_state.show_bug_form = not st.session_state.show_bug_form
-    st.title('System Sheet Search')
-    if "search_button" not in st.session_state:
-        st.session_state.search_button = False 
-    if search_button or st.session_state.search_button:
-        st.session_state.search_button = True
-        i=0
-        if not company_input and not panel_input:
-            st.write("Please Enter a Name/Code to search")
-        else:
-            matched_df = get_search_output(company_input, panel_input)
-            
-            if matched_df.empty:
-                st.write("No System Sheet Found For This Code")
-            else:
-                # Filter by year
-                matched_df['year'] = pd.to_datetime(matched_df['date']).dt.year
-                year_list = matched_df['year'].unique()
-                year_list = sorted(year_list, reverse=True)
-                selected_year = st.multiselect('Select Year', year_list)
-                filtered_df = matched_df[matched_df['year'].isin(selected_year)]
-                
-                pdf_path_list = filtered_df['pdf_path'].tolist()
-                image_path_list = filtered_df['image_path'].tolist()
-                pdf_name_list = filtered_df['pdf_name'].tolist()
-                
-                
-                st.write("Total System Sheet Found:", len(pdf_path_list))
-                st.write("System Sheet Characteristics")
-                
-                
-                # Sheen plot
-                sheen_df = filtered_df['sheen'].value_counts().reset_index()
-                sheen_fig = px.bar(sheen_df, x='sheen', y='count', text='count')
-                sheen_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
-                st.plotly_chart(sheen_fig, use_container_width=True)
-                # Paint system grouped plot
-                paint_system_df = filtered_df['paint_system_grouped'].value_counts().reset_index()
-                paint_system_fig = px.bar(paint_system_df, x='paint_system_grouped', y='count', text='count')
-                paint_system_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
-                st.plotly_chart(paint_system_fig, use_container_width=True)
-                # Substrate plot
-                df_substrate = get_substrate()
-                df_substrate = df_substrate[df_substrate['pdf_name'].isin(pdf_name_list)]
-                df_substrate = df_substrate[df_substrate['tw']!='']
-                df_substrate['substrate_combined'] = df_substrate['vn'] + ' - ' + df_substrate['tw']
-                df_substrate = df_substrate['substrate_combined'].value_counts().reset_index()
-                substrate_fig = px.bar(df_substrate, x='substrate_combined', y='count', text='count')
-                substrate_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
-                st.plotly_chart(substrate_fig, use_container_width=True)
-                
-                if show_system_sheet:
-                    for image_path, pdf_path in zip(image_path_list, pdf_path_list):
-                        i+=1
-                        # with st.container():
-                        col_1, col_2 = st.columns(2)
-                        with col_1:
-                            try:
-                                st.write(f"Search Result No.{i}")
-                                display_image(image_path)
-                                st.write(pdf_path)
-                            except:
-                                st.write('No Image Preview For This System Sheet')
-                        with col_2:
-                            try:
-                                #display_pdf_with_google_drive(pdf_id)
-                                display_PDF(pdf_path)
-                                download_PDF(pdf_path)
-                                #st.write(pdf_path)
-                            except:
-                                st.write('No PDF Preview For This System Sheet')
-                                #st.write(pdf_path)
-                
-#########################################
-    #Bug Report Form
-#########################################
-    UPLOAD_DIR = r"D:\VL1251\uploaded_images"
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    st.markdown("---")
-
-    if st.session_state.show_bug_form:
-        st.header("Report a Bug")
-
-        # Create a form for the bug report
-        with st.form("bug_report_form", clear_on_submit=True):
-            bug_description = st.text_area("Describe the bug")
-            user_email = st.text_input("Your email (Optional)", placeholder="your_email@gmail.com")
-            
-            # Image upload component
-            uploaded_image = st.file_uploader("Upload an image (Recommended)", type=["png", "jpg", "jpeg"])
-            
-            # Submit button
-            submit_button = st.form_submit_button(label="Submit Bug Report")
-            
-            # Handle the form submission
-            if submit_button:
-                image_path = None
-                
-                # Save the uploaded image if there is one
-                if uploaded_image is not None:
-                    # Generate a unique file name using UUID
-                    file_extension = os.path.splitext(uploaded_image.name)[1]  # Get the file extension (e.g., .jpg, .png)
-                    new_file_name = f"{uuid.uuid4()}{file_extension}"  # Create a unique file name
-                    image_path = os.path.join(UPLOAD_DIR, new_file_name)
-                    
-                    # Save the file with the new name
-                    with open(image_path, "wb") as f:
-                        f.write(uploaded_image.getbuffer())
-                
-                if bug_description:
-                    if save_bug_report_to_db(bug_description, user_email, image_path):
-                        st.success("Bug report submitted successfully. Thank you!")
-                    else:
-                        st.error("Failed to submit bug report. Please try again later.")
-                else:
-                    st.warning("Please describe the bug before submitting.")
-
-# Main entry point of the app
-def main():
-    if st.session_state.show_login_form:
-        login_page()
-    else:
-        main_app()
-
-if __name__ == "__main__":
-    main()              
-
-
-# ngrok http --domain=huge-eminently-lynx.ngrok-free.app 8501
