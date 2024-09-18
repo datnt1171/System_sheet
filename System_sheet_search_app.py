@@ -7,6 +7,7 @@ Created on Sat Aug 24 11:10:53 2024
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import psycopg2
 from psycopg2 import sql
 import streamlit_ext as ste
@@ -14,6 +15,9 @@ from datetime import datetime
 import os
 import uuid
 from streamlit_pdf_viewer import pdf_viewer
+
+import plotly.express as px
+
 #Create Connection
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
@@ -21,6 +25,7 @@ cur = conn.cursor()
 # Function Defination
 def display_PDF(file):
     pdf_viewer(file)#, rendering="legacy_iframe")
+    
 def download_PDF(file):
     with open(file, "rb") as pdf_file:
         PDFbyte = pdf_file.read()
@@ -32,6 +37,7 @@ def download_PDF(file):
 
 def display_image(file):
     st.image(image = file,use_column_width = 'always')
+    
 def get_search_output(company_input, panel_input):
     # Convert input to f-string
     company_input = f"%{company_input}%" if company_input else None
@@ -40,21 +46,26 @@ def get_search_output(company_input, panel_input):
     params = (company_input, company_input, panel_input, panel_input)
     
     cur.execute("""
-        SELECT pdf_path, image_path 
+        SELECT *
         FROM excel_data JOIN system_sheet_header 
         ON excel_data.pdf_name = system_sheet_header.pdf_name
         WHERE
-        (%s IS NULL OR factory_name_combined ILIKE %s) AND
-        (%s IS NULL OR panel_code ILIKE %s)
+        (%s IS NULL OR system_sheet_header.factory_name_combined ILIKE %s) AND
+        (%s IS NULL OR system_sheet_header.panel_code ILIKE %s)
     """, params)
     
     matched_data = cur.fetchall()
-    matched_df = pd.DataFrame(data = matched_data, columns=['pdf_path','image_path'])
-    
-    pdf_path_list = matched_df['pdf_path'].tolist()
-    image_path_list = matched_df['image_path'].tolist()
-    
-    return pdf_path_list, image_path_list
+    column_names = [description[0] for description in cur.description]
+    matched_df = pd.DataFrame(data = matched_data, columns = column_names)
+    matched_df = matched_df.loc[:,~matched_df.columns.duplicated()].copy()
+    return matched_df
+
+def get_substrate():
+    cur.execute("""SELECT * FROM substrate""")
+    substrate = cur.fetchall()
+    column_names = [description[0] for description in cur.description]
+    df_substrate = pd.DataFrame(data = substrate, columns = column_names)
+    return df_substrate
 
 def save_bug_report_to_db(report_content, user_email, image_path):
     try:
@@ -76,7 +87,6 @@ def save_bug_report_to_db(report_content, user_email, image_path):
     except Exception as e:
         st.error(f"Error saving bug report to the database: {e}")
         return False
-    
     
 
 
@@ -143,60 +153,105 @@ def login_page():
 
 
 
-
-# Search App         
+#########################################
+    # Search App  
+#########################################
+       
 def main_app():
     if "show_bug_form" not in st.session_state:
         st.session_state.show_bug_form = False 
 
     with st.sidebar:
+        
         st.markdown('# Input Company Name')
         company_input = st.text_input('E.g. Kaiser, Timber, 國掌, QUỐC TRƯỞNG')
         
         st.markdown('# Input Panel (Furniture) Code')
         panel_input = st.text_input('E.g. 212, 734')
-        
-        search_button = st.button('Search')
-        
-        report_button = st.button('Report a Bug', type = "primary")
+        st.write('\n')
+        show_system_sheet = st.checkbox('Show System Sheet', value=False)
+        st.write('\n')
+        search_button = st.button('Search', type = "primary")
+        st.write('\n')
+        report_button = st.button('Report a Bug')
         
     if report_button:
         st.session_state.show_bug_form = not st.session_state.show_bug_form
     st.title('System Sheet Search')
-    if search_button:
+    if "search_button" not in st.session_state:
+        st.session_state.search_button = False 
+    if search_button or st.session_state.search_button:
+        st.session_state.search_button = True
         i=0
         if not company_input and not panel_input:
             st.write("Please Enter a Name/Code to search")
         else:
-            pdf_path_list, image_path_list = get_search_output(company_input, panel_input)
-            if pdf_path_list:
-
-                for image_path, pdf_path in zip(image_path_list, pdf_path_list):
-                    i+=1
-                    # with st.container():
-                    col_1, col_2 = st.columns(2)
-                    with col_1:
-                        try:
-                            st.write(f"Search Result No.{i}")
-                            display_image(image_path)
-                        except:
-                            st.write('No Image Preview For This System Sheet')
-                    with col_2:
-                        try:
-                            #display_pdf_with_google_drive(pdf_id)
-                            display_PDF(pdf_path)
-                            download_PDF(pdf_path)
-                            #st.write(pdf_path)
-                        except:
-                            st.write('No PDF Preview For This System Sheet')
-                            #st.write(pdf_path)
-                    
-            else:
+            matched_df = get_search_output(company_input, panel_input)
+            
+            if matched_df.empty:
                 st.write("No System Sheet Found For This Code")
+            else:
+                # Filter by year
+                matched_df['year'] = pd.to_datetime(matched_df['date']).dt.year
+                year_list = matched_df['year'].unique()
+                year_list = sorted(year_list, reverse=True)
+                selected_year = st.multiselect('Select Year', year_list)
+                filtered_df = matched_df[matched_df['year'].isin(selected_year)]
                 
-    #########################################
+                pdf_path_list = filtered_df['pdf_path'].tolist()
+                image_path_list = filtered_df['image_path'].tolist()
+                pdf_name_list = filtered_df['pdf_name'].tolist()
+                
+                
+                st.write("Total System Sheet Found:", len(pdf_path_list))
+                st.write("System Sheet Characteristics")
+                
+                
+                # Sheen plot
+                sheen_df = filtered_df['sheen'].value_counts().reset_index()
+                sheen_fig = px.bar(sheen_df, x='sheen', y='count', text='count')
+                sheen_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
+                st.plotly_chart(sheen_fig, use_container_width=True)
+                # Paint system grouped plot
+                paint_system_df = filtered_df['paint_system_grouped'].value_counts().reset_index()
+                paint_system_fig = px.bar(paint_system_df, x='paint_system_grouped', y='count', text='count')
+                paint_system_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
+                st.plotly_chart(paint_system_fig, use_container_width=True)
+                # Substrate plot
+                df_substrate = get_substrate()
+                df_substrate = df_substrate[df_substrate['pdf_name'].isin(pdf_name_list)]
+                df_substrate = df_substrate[df_substrate['tw']!='']
+                df_substrate['substrate_combined'] = df_substrate['vn'] + ' - ' + df_substrate['tw']
+                df_substrate = df_substrate['substrate_combined'].value_counts().reset_index()
+                substrate_fig = px.bar(df_substrate, x='substrate_combined', y='count', text='count')
+                substrate_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
+                st.plotly_chart(substrate_fig, use_container_width=True)
+                
+                if show_system_sheet:
+                    for image_path, pdf_path in zip(image_path_list, pdf_path_list):
+                        i+=1
+                        # with st.container():
+                        col_1, col_2 = st.columns(2)
+                        with col_1:
+                            try:
+                                st.write(f"Search Result No.{i}")
+                                display_image(image_path)
+                                st.write(pdf_path)
+                            except:
+                                st.write('No Image Preview For This System Sheet')
+                        with col_2:
+                            try:
+                                #display_pdf_with_google_drive(pdf_id)
+                                display_PDF(pdf_path)
+                                download_PDF(pdf_path)
+                                #st.write(pdf_path)
+                            except:
+                                st.write('No PDF Preview For This System Sheet')
+                                #st.write(pdf_path)
+                
+#########################################
     #Bug Report Form
-    #########################################
+#########################################
     UPLOAD_DIR = r"D:\VL1251\uploaded_images"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -250,4 +305,4 @@ if __name__ == "__main__":
     main()              
 
 
-# #ngrok http --domain=huge-eminently-lynx.ngrok-free.app 8501
+# ngrok http --domain=huge-eminently-lynx.ngrok-free.app 8501
