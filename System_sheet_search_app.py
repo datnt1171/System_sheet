@@ -219,21 +219,21 @@ def main_app():
                 # Substrate plot
                 df_substrate = get_substrate()
                 df_substrate = df_substrate[df_substrate['pdf_name'].isin(pdf_name_list)]
-                df_substrate = df_substrate[df_substrate['tw']!='']
-                df_substrate['substrate_combined'] = df_substrate['vn'] + ' - ' + df_substrate['tw']
+                df_substrate = df_substrate[df_substrate['substrate_tw']!='']
+                df_substrate['substrate_combined'] = df_substrate['substrate_vn'] + ' - ' + df_substrate['substrate_tw']
                 df_substrate = df_substrate['substrate_combined'].value_counts().reset_index()
                 substrate_fig = px.bar(df_substrate, x='substrate_combined', y='count', text='count')
                 substrate_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
                 st.plotly_chart(substrate_fig, use_container_width=True)
                 
                 if show_system_sheet:
-                    for image_path, pdf_path in zip(image_path_list, pdf_path_list):
+                    for image_path, pdf_path, pdf_name in zip(image_path_list, pdf_path_list, pdf_name_list):
                         i+=1
                         # with st.container():
+                        st.write(f"Search Result No.{i}")
                         col_1, col_2 = st.columns(2)
                         with col_1:
                             try:
-                                st.write(f"Search Result No.{i}")
                                 display_image(image_path)
                                 #st.write(pdf_path)
                             except:
@@ -243,7 +243,7 @@ def main_app():
                                 #display_pdf_with_google_drive(pdf_id)
                                 display_PDF(pdf_path)
                                 download_PDF(pdf_path)
-                                st.write(pdf_path)
+                                st.write(pdf_name)
                             except:
                                 st.write('No PDF Preview For This System Sheet')
                                 #st.write(pdf_path)
@@ -304,4 +304,3 @@ if __name__ == "__main__":
     main()              
 
 
-# ngrok http --domain=huge-eminently-lynx.ngrok-free.app 8501
