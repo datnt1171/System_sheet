@@ -9,6 +9,7 @@ import os
 import pandas as pd
 from io import StringIO
 ## connect to postgresql
+
 import psycopg2
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
@@ -45,40 +46,40 @@ for root, dirs, files in os.walk(main_folder_path):
 
 # Convert excel file to pdf to display
 ###############################################################################
-import win32com.client
+# import win32com.client
 
-error_path_list = []
-error_sheet_list = []
-def excel_2_pdf(excel_path, excel_sheet):
+# error_path_list = []
+# error_sheet_list = []
+# def excel_2_pdf(excel_path, excel_sheet):
     
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = True
+#         excel = win32com.client.Dispatch("Excel.Application")
+#         excel.Visible = True
         
-        WB_PATH = excel_path
-        # PDF path when saving
-        PATH_TO_PDF = excel_path.replace('.xlsx','')
-        PATH_TO_PDF = PATH_TO_PDF.replace('.xls','')
-        PATH_TO_PDF = PATH_TO_PDF + "_" + excel_sheet + '.pdf'
+#         WB_PATH = excel_path
+#         # PDF path when saving
+#         PATH_TO_PDF = excel_path.replace('.xlsx','')
+#         PATH_TO_PDF = PATH_TO_PDF.replace('.xls','')
+#         PATH_TO_PDF = PATH_TO_PDF + "_" + excel_sheet + '.pdf'
         
         
-        # Open
-        try:
-            wb = excel.Workbooks.Open(WB_PATH)
-            # Specify the sheet you want to save by index. 1 is the first (leftmost) sheet.
-            wb.WorkSheets(excel_sheet).Select()
-            # Save
-            wb.ActiveSheet.ExportAsFixedFormat(0, PATH_TO_PDF)
-            wb.Close()
-            excel.Quit()
-        except:
+#         # Open
+#         try:
+#             wb = excel.Workbooks.Open(WB_PATH)
+#             # Specify the sheet you want to save by index. 1 is the first (leftmost) sheet.
+#             wb.WorkSheets(excel_sheet).Select()
+#             # Save
+#             wb.ActiveSheet.ExportAsFixedFormat(0, PATH_TO_PDF)
+#             wb.Close()
+#             excel.Quit()
+#         except:
             
-            error_path_list.append(excel_path)
-            error_sheet_list.append(excel_sheet)
+#             error_path_list.append(excel_path)
+#             error_sheet_list.append(excel_sheet)
 
 
 
-for excel_path, excel_sheet in zip(excel_path_list,excel_sheet_list):
-    excel_2_pdf(excel_path, excel_sheet)
+# for excel_path, excel_sheet in zip(excel_path_list,excel_sheet_list):
+#     excel_2_pdf(excel_path, excel_sheet)
 ###############################################################################
 
 
@@ -168,11 +169,10 @@ cur.execute("INSERT INTO users (username, password) VALUES ('stanley', '123')")
 cur.execute("INSERT INTO users (username, password) VALUES ('dungtq', '123')")
 
 conn.commit()
-cur.close()
-conn.close()
 
-cur.execute("SELECT * from excel_data where excel_text like '%5703%' ;")
-temp = cur.fetchall()
+
+# cur.execute("SELECT * from excel_data where excel_text like '%5703%' ;")
+# temp = cur.fetchall()
 
 
 
@@ -180,6 +180,7 @@ temp = cur.fetchall()
 
 # System sheet header
 cur.execute("DROP table system_sheet_header")
+conn.commit()
 cur.execute("""CREATE TABLE system_sheet_header(
             pdf_name TEXT,
             date DATE,
@@ -201,6 +202,32 @@ output.seek(0)
 
 # Define the table name
 table_name = 'system_sheet_header'
+
+try:
+    # Copy data to the table
+    cur.copy_from(output, table_name, sep='\t')
+    conn.commit()
+    print("DataFrame imported to PostgreSQL successfully!")
+except Exception as e:
+    print(f"An error occurred: {e}")
+
+
+
+df_substrate = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\df_substrate.xlsx')
+df_substrate = df_substrate[['pdf_name','substrate_gb','substrate_vn','substrate_tw']]
+output = StringIO()
+df_substrate.to_csv(output, sep='\t', header=False, index=False)
+output.seek(0)
+cur.execute("""DROP TABLE substrate""")
+conn.commit()
+cur.execute("""CREATE TABLE substrate(
+            pdf_name TEXT,
+            gb TEXT,
+            vn TEXT,
+            tw TEXT)""")
+conn.commit()
+# Define the table name
+table_name = 'substrate'
 
 try:
     # Copy data to the table
