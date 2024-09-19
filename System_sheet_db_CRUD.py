@@ -11,37 +11,42 @@ from io import StringIO
 ## connect to postgresql
 
 import psycopg2
+
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
 
 main_folder_path = r'D:\VL1251\Ratio_compare\production_process\QUY TRINH MOI'
 
-excel_name_list = []
-excel_sheet_list = []
-#excel_text_list = []
-excel_path_list = []
+def get_excel_information(path_to_folder):
+    
+    excel_name_list = []
+    excel_sheet_list = []
+    excel_path_list = []
+    
+    # Get the information of excel file
+    for root, dirs, files in os.walk(path_to_folder):
+        for file in files:
+            if file.endswith('.xlsx') or file.endswith('.xls'):
+                file_path = os.path.join(root, file)
+                
+                # Read all sheets from the Excel file
+                excel_sheets = pd.read_excel(file_path, sheet_name=None)
+                
+                # Loop through each sheet
+                for sheet_name, sheet_data in excel_sheets.items():
+                    # Append file name
+                    excel_name_list.append(file)
+                    # Append sheet name
+                    excel_sheet_list.append(sheet_name)
+                    # Append the DataFrame for the current sheet
+                    #excel_text_list.append(sheet_data)
+                    # Append the path to the list
+                    excel_path_list.append(file_path)
+    return excel_name_list, excel_sheet_list, excel_path_list
 
 
-# Get the information of excel file
-for root, dirs, files in os.walk(main_folder_path):
-    for file in files:
-        if file.endswith('.xlsx') or file.endswith('.xls'):
-            file_path = os.path.join(root, file)
-            
-            # Read all sheets from the Excel file
-            excel_sheets = pd.read_excel(file_path, sheet_name=None)
-            
-            # Loop through each sheet
-            for sheet_name, sheet_data in excel_sheets.items():
-                # Append file name
-                excel_name_list.append(file)
-                # Append sheet name
-                excel_sheet_list.append(sheet_name)
-                # Append the DataFrame for the current sheet
-                #excel_text_list.append(sheet_data)
-                # Append the path to the list
-                excel_path_list.append(file_path)
+excel_name_list, excel_sheet_list, excel_path_list = get_excel_information(main_folder_path)
 
 
 # Convert excel file to pdf to display
@@ -182,6 +187,7 @@ conn.commit()
 cur.execute("DROP table system_sheet_header")
 conn.commit()
 cur.execute("""CREATE TABLE system_sheet_header(
+            id INTEGER,
             pdf_name TEXT,
             date DATE,
             factory_name_combined TEXT,
@@ -190,12 +196,12 @@ cur.execute("""CREATE TABLE system_sheet_header(
             paint_system TEXT,
             sheen TEXT,
             distressing TEXT,
-            customber_name TEXT,
+            customer_name TEXT,
             description TEXT)""")
 conn.commit()
 
 
-system_sheet_header = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\new_db.xlsx')
+system_sheet_header = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\system_sheet_header.xlsx')
 output = StringIO()
 system_sheet_header.to_csv(output, sep='\t', header=False, index=False)
 output.seek(0)
@@ -213,19 +219,23 @@ except Exception as e:
 
 
 
-df_substrate = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\df_substrate.xlsx')
-df_substrate = df_substrate[['pdf_name','substrate_gb','substrate_vn','substrate_tw']]
-output = StringIO()
-df_substrate.to_csv(output, sep='\t', header=False, index=False)
-output.seek(0)
 cur.execute("""DROP TABLE substrate""")
 conn.commit()
 cur.execute("""CREATE TABLE substrate(
+            id INTEGER,
             pdf_name TEXT,
-            gb TEXT,
-            vn TEXT,
-            tw TEXT)""")
+            substrate_gb TEXT,
+            substrate_vn TEXT,
+            substrate_tw TEXT)""")
 conn.commit()
+
+df_substrate = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\df_substrate.xlsx')
+df_substrate = df_substrate[['id','pdf_name','substrate_gb','substrate_vn','substrate_tw']]
+
+output = StringIO()
+df_substrate.to_csv(output, sep='\t', header=False, index=False)
+output.seek(0)
+
 # Define the table name
 table_name = 'substrate'
 
@@ -236,8 +246,3 @@ try:
     print("DataFrame imported to PostgreSQL successfully!")
 except Exception as e:
     print(f"An error occurred: {e}")
-finally:
-    if cur:
-        cur.close()
-    if conn:
-        conn.close()
