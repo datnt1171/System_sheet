@@ -6,7 +6,6 @@ Created on Thu Sep 19 10:56:29 2024
 """
 
 import pandas as pd
-
 import psycopg2
 
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
@@ -47,7 +46,7 @@ def insert_data(df_data, table_name):
         
 # Check_point
 check_point = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\check_point.xlsx')
-check_point_id = check_point['check_point'][0]
+check_point_id = check_point['id'][0]
 
 # System_sheet_header data
 system_sheet_header = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\system_sheet_header.xlsx')
@@ -66,4 +65,6 @@ insert_data(df_substrate,'substrate') #Insert data
 df = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\new_excel_data.xlsx')
 insert_data(df,'excel_data') #Insert data
 
-
+# Update check_point
+new_check_point = system_sheet_header['id'].tail(1)
+new_check_point.to_excel(r'D:\VL1251\Ratio_compare\production_process\check_point.xlsx')
