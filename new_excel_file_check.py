@@ -3,26 +3,39 @@ import pandas as pd
 import shutil
 import win32com.client
 
-main_folder_path = r'D:\VL1251\Ratio_compare\production_process\QUY TRINH MOI'
 check_folder_path = r'U:\QUY TRINH MOI'
+Input_time = input("Enter date to filter:")
 
 # Check for new file
-def get_cm_time(folder_path):
+def get_cm_time(path_to_folder):
     excel_path_list = []
     excel_name_list = []
+    excel_sheet_list = []
     excel_ctime = []
     excel_mtime = []
-    for root, dirs, files in os.walk(folder_path):
+    for root, dirs, files in os.walk(path_to_folder):
         for file in files:
             if file.endswith('.xlsx') or file.endswith('.xls'):
                 file_path = os.path.join(root, file)
-                excel_name_list.append(os.path.basename(file_path))
-                excel_path_list.append(file_path)
-                excel_ctime.append(os.path.getctime(file_path))
-                excel_mtime.append(os.path.getmtime(file_path))
-    
+                
+                # Read all sheets from the Excel file
+                excel_sheets = pd.read_excel(file_path, sheet_name=None)
+                
+                # Loop through each sheet
+                for sheet_name, sheet_data in excel_sheets.items():
+                    # Append the path to the list
+                    excel_path_list.append(file_path)
+                    # Append file name
+                    excel_name_list.append(file)
+                    # Append sheet name
+                    excel_sheet_list.append(sheet_name)
+                    # Append the DataFrame for the current sheet
+                    #excel_text_list.append(sheet_data)
+                    excel_ctime.append(os.path.getctime(file_path))
+                    excel_mtime.append(os.path.getmtime(file_path))
     map_time = {'excel_path':excel_path_list,
                 'excel_name':excel_name_list,
+                'excel_sheet':excel_sheet_list,
                 'ctime':excel_ctime,
                 'mtime':excel_mtime}
     
@@ -32,19 +45,32 @@ def get_cm_time(folder_path):
     return df
 
 
-df_main = get_cm_time(main_folder_path) #Old file
+df_main = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\header_2.xlsx') #Old file
 df_check = get_cm_time(check_folder_path) #New file
 
+# get pdf_name
+df_check['pdf_name'] = df_check['excel_name'].str.replace(r'.xlsx','')
+df_check['pdf_name'] = df_check['pdf_name'].str.replace(r'.xls','')
+df_check['pdf_name'] = df_check['pdf_name'] + "_" + df_check['excel_sheet'] + ".pdf"
+
+# Filter by date
+df_new = df_check[df_check['mtime']>=Input_time]
 # Get diff file
-main_excel_name = df_main['excel_name']
-check_excel_name = df_check['excel_name']
-excel_new = set(check_excel_name) - set(main_excel_name)
-df_new = df_check[df_check['excel_name'].isin(excel_new)]
+main_pdf_name = df_main['pdf_name']
+check_pdf_name = df_new['pdf_name']
+pdf_new = set(check_pdf_name) - set(main_pdf_name)
+df_new = df_new[df_new['pdf_name'].isin(pdf_new)]
 
 # Remove Ignore file (non-system_sheet file)
 df_ignore = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\ignore_list.xlsx')
-ignore_list = df_ignore['excel_name']
-df_new = df_new[~df_new['excel_name'].isin(ignore_list)]
+excel_ignore_list = df_ignore['excel_name']
+df_new = df_new[~df_new['excel_name'].isin(excel_ignore_list)]
+
+# Ignore sheet list
+ignore_sheet_list = ['打打打打打','資料資料','INININ.A4x2','MAU1','MAU2','NEW','空白表格-再修改'
+                     ,'產品編號','V','Material code','印-V','印-中']
+df_new = df_new[~df_new['excel_sheet'].isin(ignore_sheet_list)]
+
 
 # Convert unix time to m/d/yyyy
 df_new['ctime'] = df_new['ctime'].dt.date
@@ -53,11 +79,10 @@ df_new.sort_values(by='ctime', inplace=True)
 
 
 
-
 # Copy new file to temp folder to check
 copy_folder = r'D:\VL1251\Ratio_compare\production_process\NEW_FILE_CHECK'
 
-excel_file_source = df_new['excel_path'].tolist()
+excel_file_source = set(df_new['excel_path'])
 for file_path in excel_file_source:
     # Get the file name
     file_name = os.path.basename(file_path)
@@ -102,11 +127,11 @@ excel_name_list, excel_sheet_list, excel_path_list = get_excel_information(copy_
     
 
 
-
+excel = win32com.client.Dispatch("Excel.Application")
+excel.Visible = False
 def excel_2_pdf(excel_path, excel_sheet):
 
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = False
+        
         
         WB_PATH = excel_path
         # PDF path when saving
@@ -133,8 +158,7 @@ def excel_2_pdf(excel_path, excel_sheet):
 error_path_list = []
 error_sheet_list = []
 
-ignore_sheet_list = ['打打打打打','資料資料','INININ.A4x2','MAU1','MAU2','NEW','空白表格-再修改'
-                     ,'產品編號','V','Material code','印-V','印-中']
+
 for excel_path, excel_sheet in zip(excel_path_list,excel_sheet_list):
     if excel_sheet in ignore_sheet_list:
         continue
@@ -168,8 +192,3 @@ for col in col_path:
     df[col] = df[col].str.replace(r'NEW_FILE_CHECK','QUY TRINH MOI')
 
 df.to_excel(r'D:\VL1251\Ratio_compare\production_process\new_excel_data.xlsx', index=False)
-
-
-
-
-
