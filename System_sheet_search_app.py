@@ -21,6 +21,10 @@ import plotly.express as px
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
 cur = conn.cursor()
 
+df_temp = pd.read_excel(r'D:\VL1251\Ratio_compare\production_process\system_sheet_header.xlsx')
+factory_name_combined_list = df_temp['factory_name_combined'].unique()
+factory_name_combined_list = factory_name_combined_list.tolist()
+
 # Function Defination
 def display_PDF(file):
     pdf_viewer(file)#, rendering="legacy_iframe")
@@ -38,21 +42,34 @@ def display_image(file):
     st.image(image = file,use_column_width = 'always')
     
 def get_search_output(company_input, panel_input):
-    # Convert input to f-string
-    company_input = f"%{company_input}%" if company_input else None
-    panel_input = f"%{panel_input}%" if panel_input else None
-    #params
-    params = (company_input, company_input, panel_input, panel_input)
+    # Handling company_input: if multiple companies selected, use 'IN' clause
+    company_clause = ""
+    if company_input:  # Only if companies are selected
+        company_input = tuple(company_input)  # Convert to tuple for SQL `IN`
+        company_clause = "system_sheet_header.factory_name_combined IN %s"
+    else:
+        company_clause = "TRUE"  # No filter if nothing is selected
     
-    cur.execute("""
+    # Handling panel_input: keeping as text search for now
+    panel_input = f"%{panel_input}%" if panel_input else None
+    panel_clause = "system_sheet_header.panel_code ILIKE %s" if panel_input else "TRUE"
+    
+    # Prepare SQL query dynamically
+    query = f"""
         SELECT *
-        FROM excel_data JOIN system_sheet_header 
+        FROM excel_data 
+        JOIN system_sheet_header 
         ON excel_data.pdf_name = system_sheet_header.pdf_name
         WHERE
-        (%s IS NULL OR system_sheet_header.factory_name_combined ILIKE %s) AND
-        (%s IS NULL OR system_sheet_header.panel_code ILIKE %s)
-    """, params)
+        {company_clause} AND
+        {panel_clause}
+    """
     
+    # If company_input is provided, pass it as a parameter; otherwise, None
+    params = (company_input if company_input else None, panel_input) if panel_input else (company_input,)
+    
+    # Execute the query with the correct number of parameters
+    cur.execute(query, params)
     matched_data = cur.fetchall()
     column_names = [description[0] for description in cur.description]
     matched_df = pd.DataFrame(data = matched_data, columns = column_names)
@@ -163,7 +180,7 @@ def main_app():
     with st.sidebar:
         
         st.markdown('# Input Company Name')
-        company_input = st.text_input('E.g. Kaiser, Timber, 國掌, QUỐC TRƯỞNG')
+        company_input = st.multiselect('E.g. Kaiser, Timber, 國掌, QUỐC TRƯỞNG', factory_name_combined_list)
         
         st.markdown('# Input Panel (Furniture) Code')
         panel_input = st.text_input('E.g. 212, 734')
@@ -238,16 +255,19 @@ def main_app():
                                 #st.write(pdf_path)
                             except:
                                 st.write('No Image Preview For This System Sheet')
+                            try:
+                                st.write(pdf_name)
+                            except:
+                                pass
                         with col_2:
                             try:
                                 #display_pdf_with_google_drive(pdf_id)
                                 display_PDF(pdf_path)
                                 download_PDF(pdf_path)
-                                st.write(pdf_name)
                             except:
                                 st.write('No PDF Preview For This System Sheet')
                                 #st.write(pdf_path)
-                
+
 #########################################
     #Bug Report Form
 #########################################
@@ -302,5 +322,4 @@ def main():
 
 if __name__ == "__main__":
     main()              
-
 
