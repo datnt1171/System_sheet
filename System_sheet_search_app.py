@@ -38,6 +38,17 @@ def download_PDF(file):
                     file_name=str(file),
                     mime='application/octet-stream')
 
+def download_excel(file):
+    # Open the Excel file in binary mode
+    with open(file, "rb") as excel_file:
+        excel_bytes = excel_file.read()
+
+    # Create a download button using streamlit_ext for Excel file download
+    ste.download_button(label="Download Excel",
+                        data=excel_bytes,
+                        file_name=file.split('/')[-1],  # Keep the original file name
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')  # Set the correct mime type for Excel files
+
 def display_image(file):
     st.image(image = file,use_column_width = 'always')
     
@@ -217,7 +228,7 @@ def main_app():
                 pdf_path_list = filtered_df['pdf_path'].tolist()
                 image_path_list = filtered_df['image_path'].tolist()
                 pdf_name_list = filtered_df['pdf_name'].tolist()
-                
+                excel_path_list = filtered_df['excel_path'].tolist()
                 
                 st.write("Total System Sheet Found:", len(pdf_path_list))
                 st.write("System Sheet Characteristics")
@@ -228,11 +239,13 @@ def main_app():
                 sheen_fig = px.bar(sheen_df, x='sheen', y='count', text='count')
                 sheen_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
                 st.plotly_chart(sheen_fig, use_container_width=True)
+                
                 # Paint system grouped plot
                 paint_system_df = filtered_df['paint_system_grouped'].value_counts().reset_index()
                 paint_system_fig = px.bar(paint_system_df, x='paint_system_grouped', y='count', text='count')
                 paint_system_fig.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
                 st.plotly_chart(paint_system_fig, use_container_width=True)
+                
                 # Substrate plot
                 df_substrate = get_substrate()
                 df_substrate = df_substrate[df_substrate['pdf_name'].isin(pdf_name_list)]
@@ -244,7 +257,7 @@ def main_app():
                 st.plotly_chart(substrate_fig, use_container_width=True)
                 
                 if show_system_sheet:
-                    for image_path, pdf_path, pdf_name in zip(image_path_list, pdf_path_list, pdf_name_list):
+                    for image_path, pdf_path, pdf_name, excel_path in zip(image_path_list, pdf_path_list, pdf_name_list, excel_path_list):
                         i+=1
                         # with st.container():
                         st.write(f"Search Result No.{i}")
@@ -263,7 +276,7 @@ def main_app():
                             try:
                                 #display_pdf_with_google_drive(pdf_id)
                                 display_PDF(pdf_path)
-                                download_PDF(pdf_path)
+                                download_excel(excel_path)
                             except:
                                 st.write('No PDF Preview For This System Sheet')
                                 #st.write(pdf_path)
