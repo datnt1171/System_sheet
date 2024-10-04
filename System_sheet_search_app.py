@@ -15,7 +15,12 @@ import os
 import uuid
 from streamlit_pdf_viewer import pdf_viewer
 
+from time import sleep
 import plotly.express as px
+import language
+translations = language.translations
+
+
 
 #Create Connection
 conn = psycopg2.connect(database="system_sheet", user="postgres", password="lkjhgnhI1@", host="localhost", port=5432)
@@ -186,37 +191,44 @@ def login_page():
        
 def main_app():
     if "show_bug_form" not in st.session_state:
-        st.session_state.show_bug_form = False 
-
-    with st.sidebar:
+        st.session_state.show_bug_form = False
         
-        st.markdown('# Input Company Name')
+    with st.sidebar:
+        language = st.selectbox(
+        "Select Language",
+        ['Chinese (Traditional)','English', 'Vietnamese'])
+        
+    with st.sidebar:
+        current_lang = translations[language]
+        st.markdown(f"# {current_lang['company_name']}")
         company_input = st.multiselect('E.g. Kaiser, Timber, 國掌, QUỐC TRƯỞNG', factory_name_combined_list)
         
-        st.markdown('# Input Panel (Furniture) Code')
+        st.markdown(f"# {current_lang['panel_code']}")
         panel_input = st.text_input('E.g. 212, 734')
         st.write('\n')
-        show_system_sheet = st.checkbox('Show System Sheet', value=False)
+        show_system_sheet = st.checkbox(f"# {current_lang['show_pdf']}", value=False)
         st.write('\n')
-        search_button = st.button('Search', type = "primary")
+        search_button = st.button(current_lang['search'], type = "primary")
         st.write('\n')
-        report_button = st.button('Report a Bug')
+        report_button = st.button(current_lang['report_bug'])
         
     if report_button:
         st.session_state.show_bug_form = not st.session_state.show_bug_form
-    st.title('System Sheet Search')
+        st.session_state.search_button = False
+    st.title(current_lang['title'])
     if "search_button" not in st.session_state:
         st.session_state.search_button = False 
     if search_button or st.session_state.search_button:
         st.session_state.search_button = True
+        st.session_state.show_bug_form = False
         i=0
         if not company_input and not panel_input:
-            st.write("Please Enter a Name/Code to search")
+            st.write(current_lang['no_input'])
         else:
             matched_df = get_search_output(company_input, panel_input)
             
             if matched_df.empty:
-                st.write("No System Sheet Found For This Code")
+                st.write(current_lang['no_data'])
             else:
                 # Filter by year
                 matched_df['year'] = pd.to_datetime(matched_df['date']).dt.year
@@ -230,8 +242,8 @@ def main_app():
                 pdf_name_list = filtered_df['pdf_name'].tolist()
                 excel_path_list = filtered_df['excel_path'].tolist()
                 
-                st.write("Total System Sheet Found:", len(pdf_path_list))
-                st.write("System Sheet Characteristics")
+                st.write(current_lang['num_found'], len(pdf_path_list))
+                st.write(current_lang['characteristic'])
                 
                 
                 # Sheen plot
@@ -267,7 +279,7 @@ def main_app():
                                 display_image(image_path)
                                 #st.write(pdf_path)
                             except:
-                                st.write('No Image Preview For This System Sheet')
+                                st.write(current_lang['no_image'])
                             try:
                                 st.write(pdf_name)
                             except:
@@ -278,7 +290,7 @@ def main_app():
                                 display_PDF(pdf_path)
                                 download_excel(excel_path)
                             except:
-                                st.write('No PDF Preview For This System Sheet')
+                                st.write(current_lang['no_pdf'])
                                 #st.write(pdf_path)
 
 #########################################
@@ -290,18 +302,18 @@ def main_app():
     st.markdown("---")
 
     if st.session_state.show_bug_form:
-        st.header("Report a Bug")
+        st.header(current_lang['report_bug'])
 
         # Create a form for the bug report
         with st.form("bug_report_form", clear_on_submit=True):
-            bug_description = st.text_area("Describe the bug")
-            user_email = st.text_input("Your email (Optional)", placeholder="your_email@gmail.com")
+            bug_description = st.text_area(current_lang['bug_info'])
+            user_email = st.text_input(current_lang['email'], placeholder="your_email@gmail.com")
             
             # Image upload component
-            uploaded_image = st.file_uploader("Upload an image (Recommended)", type=["png", "jpg", "jpeg"])
+            uploaded_image = st.file_uploader(current_lang['image_upload'], type=["png", "jpg", "jpeg"])
             
             # Submit button
-            submit_button = st.form_submit_button(label="Submit Bug Report")
+            submit_button = st.form_submit_button(label=current_lang['submit_bug'])
             
             # Handle the form submission
             if submit_button:
@@ -320,11 +332,11 @@ def main_app():
                 
                 if bug_description:
                     if save_bug_report_to_db(bug_description, user_email, image_path):
-                        st.success("Bug report submitted successfully. Thank you!")
+                        st.success(current_lang['bug_submited'])
                     else:
-                        st.error("Failed to submit bug report. Please try again later.")
+                        st.error(current_lang['bug_error'])
                 else:
-                    st.warning("Please describe the bug before submitting.")
+                    st.warning(current_lang['bug_warning'])
 
 # Main entry point of the app
 def main():
