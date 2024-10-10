@@ -15,7 +15,6 @@ import os
 import uuid
 from streamlit_pdf_viewer import pdf_viewer
 
-from time import sleep
 import plotly.express as px
 import language
 translations = language.translations
@@ -60,15 +59,22 @@ def display_image(file):
 def get_search_output(company_input, panel_input):
     # Handling company_input: if multiple companies selected, use 'IN' clause
     company_clause = ""
+    params = []
+    
     if company_input:  # Only if companies are selected
         company_input = tuple(company_input)  # Convert to tuple for SQL `IN`
         company_clause = "system_sheet_header.factory_name_combined IN %s"
+        params.append(company_input)
     else:
         company_clause = "TRUE"  # No filter if nothing is selected
     
     # Handling panel_input: keeping as text search for now
-    panel_input = f"%{panel_input}%" if panel_input else None
-    panel_clause = "system_sheet_header.panel_code ILIKE %s" if panel_input else "TRUE"
+    if panel_input:
+        panel_input = f"%{panel_input}%"
+        panel_clause = "system_sheet_header.panel_code ILIKE %s"
+        params.append(panel_input)
+    else:
+        panel_clause = "TRUE"
     
     # Prepare SQL query dynamically
     query = f"""
@@ -80,9 +86,6 @@ def get_search_output(company_input, panel_input):
         {company_clause} AND
         {panel_clause}
     """
-    
-    # If company_input is provided, pass it as a parameter; otherwise, None
-    params = (company_input if company_input else None, panel_input) if panel_input else (company_input,)
     
     # Execute the query with the correct number of parameters
     cur.execute(query, params)
